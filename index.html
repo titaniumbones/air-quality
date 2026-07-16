@@ -87,6 +87,12 @@
         <div class="card-header-right">
           <span class="key"><span class="key-line key-solid"></span>Observed</span>
           <span class="key"><span class="key-line key-dashed"></span>Forecast</span>
+          <span class="key" id="model-key" hidden><span class="key-line key-dotted"></span>Model estimate</span>
+          <label class="overlay-label">
+            <input type="checkbox" id="model-toggle">
+            Model estimate (+72&nbsp;h)
+          </label>
+          <span id="model-status" class="model-status"></span>
           <button id="table-toggle" class="ghost-btn" aria-pressed="false">Table view</button>
         </div>
       </header>

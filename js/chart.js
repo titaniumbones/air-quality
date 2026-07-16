@@ -26,18 +26,19 @@ const BANDS = [
 /**
  * @param container  host element (emptied and refilled)
  * @param tooltipHost positioned ancestor for the tooltip div
- * @param data {obs:[{t,v}], fcst:[{t,v}]} sorted by time (ms epochs)
+ * @param data {obs:[{t,v}], fcst:[{t,v}], model?:[{t,v}]} sorted by time (ms epochs)
  */
 export function renderTimeline(container, tooltipHost, data) {
   container.textContent = '';
   tooltipHost.querySelectorAll('.chart-tooltip').forEach((n) => n.remove());
+  const model = data.model || [];
   const width = container.clientWidth || 800;
   const height = 320;
   const m = { top: 18, right: 74, bottom: 30, left: 34 };
   const pw = width - m.left - m.right;
   const ph = height - m.top - m.bottom;
 
-  const all = [...data.obs, ...data.fcst];
+  const all = [...data.obs, ...data.fcst, ...model];
   if (!all.length) {
     container.textContent = 'No data available.';
     return;
@@ -143,6 +144,13 @@ export function renderTimeline(container, tooltipHost, data) {
     el('path', { d: path(fpts), class: 'fcst-line' }, svg);
   }
 
+  // --- model estimate: dotted continuation beyond the official forecast ---
+  if (model.length) {
+    const lead = data.fcst[data.fcst.length - 1] || data.obs[data.obs.length - 1];
+    const mpts = lead ? [lead, ...model] : model;
+    el('path', { d: path(mpts), class: 'model-line' }, svg);
+  }
+
   // --- "now" marker ---
   const now = Date.now();
   if (now > t0 && now < t1) {
@@ -163,8 +171,11 @@ export function renderTimeline(container, tooltipHost, data) {
   }
 
   // --- hover layer: crosshair + tooltip, keyboard navigable ---
-  const points = all.slice().sort((a, b) => a.t - b.t);
-  const obsEnd = data.obs.length ? data.obs[data.obs.length - 1].t : -Infinity;
+  const points = [
+    ...data.obs.map((p) => ({ ...p, kind: 'Observed' })),
+    ...data.fcst.map((p) => ({ ...p, kind: 'Forecast' })),
+    ...model.map((p) => ({ ...p, kind: 'Model estimate' })),
+  ].sort((a, b) => a.t - b.t);
   const cross = el('line', {
     y1: m.top, y2: m.top + ph, class: 'crosshair', visibility: 'hidden',
   }, svg);
@@ -201,7 +212,7 @@ export function renderTimeline(container, tooltipHost, data) {
     key.className = 'tt-key';
     key.style.background = categoryFor(p.v)?.color || '';
     cat.append(key, document.createTextNode(
-      ` ${categoryFor(p.v)?.name ?? ''} · ${p.t > obsEnd ? 'Forecast' : 'Observed'}`
+      ` ${categoryFor(p.v)?.name ?? ''} · ${p.kind}`
     ));
     const when = document.createElement('div');
     when.className = 'tt-when';
@@ -258,14 +269,17 @@ export function renderTable(container, data) {
     head.appendChild(th);
   }
   const body = table.createTBody();
-  const obsEnd = data.obs.length ? data.obs[data.obs.length - 1].t : -Infinity;
-  const rows = [...data.obs, ...data.fcst].sort((a, b) => b.t - a.t);
+  const rows = [
+    ...data.obs.map((p) => ({ ...p, kind: 'Observed' })),
+    ...data.fcst.map((p) => ({ ...p, kind: 'Forecast' })),
+    ...(data.model || []).map((p) => ({ ...p, kind: 'Model estimate' })),
+  ].sort((a, b) => b.t - a.t);
   for (const p of rows) {
     const tr = body.insertRow();
     tr.insertCell().textContent = fmtDayTime(p.t);
     tr.insertCell().textContent = displayValue(p.v);
     tr.insertCell().textContent = categoryFor(p.v)?.name ?? '';
-    tr.insertCell().textContent = p.t > obsEnd ? 'Forecast' : 'Observed';
+    tr.insertCell().textContent = p.kind;
   }
   container.appendChild(table);
 }
