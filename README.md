@@ -24,6 +24,8 @@ All data comes from the [MSC GeoMet](https://eccc-msc.github.io/open-data/msc-ge
 
 - GeoMet **WMS** `RAQDPS.SFC_PM2.5` — surface PM2.5 from the Regional Air Quality Deterministic Prediction System, used as the optional map overlay (hourly steps, ~72 h ahead).
 
+- GeoMet **WMS GetFeatureInfo** on `RAQDPS.SFC_PM2.5` / `SFC_O3` / `SFC_NO2` — point-sampled at the selected station to compute an optional **model-estimated AQHI** (published AQHI formula, 3-hour rolling means) for hours beyond the official hourly forecast, out to the model's +72 h horizon. Clearly labeled "Model estimate" and drawn dotted: it is raw model guidance, not a forecaster product, so it can disagree with the period bulletin.
+
 ## Seven-day history
 
 The realtime API only keeps ~3 days of observations. `.github/workflows/archive.yml` runs every 6 hours, fetches all Ontario observations with `scripts/update_archive.py` (stdlib only), and commits a rolling 9-day window to `data/archive/observations.json`. The app merges this archive with the live API, so the 7-day view fills in after the workflow has run for a few days.

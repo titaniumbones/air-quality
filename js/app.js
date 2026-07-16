@@ -10,6 +10,7 @@ import {
   AQHI_COLORS, fmtDayTime, fmtTime,
 } from './aqhi.js';
 import { renderTimeline, renderTable, renderSparkline } from './chart.js';
+import { fetchModelAqhi } from './model.js';
 import { AqhiMap, buildTimeline } from './map.js';
 
 const HOUR = 3600 * 1000;
@@ -23,6 +24,9 @@ const state = {
   station: localStorage.getItem('aqhi-station') || 'FCWYG', // Toronto Downtown
   rangeHours: 72,
   map: null,
+  modelOn: false,
+  modelSeries: new Map(), // stationId -> [{t,v}] model-estimated AQHI
+  modelRange: null,       // {start,end} of the RAQDPS layer, fetched once
 };
 
 // ---------- theme ----------
@@ -54,7 +58,11 @@ function chartData() {
   const obs = seriesFor(state.station, state.obs).filter((d) => d.t >= cutoff);
   const obsEnd = obs.length ? obs[obs.length - 1].t : 0;
   const fcst = seriesFor(state.station, state.fcst).filter((d) => d.t > obsEnd);
-  return { obs, fcst };
+  const fcstEnd = fcst.length ? fcst[fcst.length - 1].t : obsEnd;
+  const model = state.modelOn
+    ? (state.modelSeries.get(state.station) || []).filter((d) => d.t > fcstEnd)
+    : [];
+  return { obs, fcst, model };
 }
 
 // ---------- stat tiles ----------
@@ -293,6 +301,7 @@ function selectStation(id) {
   renderTiles();
   renderChart();
   renderForecastCards();
+  if (state.modelOn) ensureModelSeries().then(renderChart);
 }
 
 function initRangeButtons() {
@@ -305,6 +314,61 @@ function initRangeButtons() {
       renderChart();
     });
   }
+}
+
+// ---------- model estimate (+72 h) ----------
+async function ensureModelSeries() {
+  const id = state.station;
+  if (state.modelSeries.has(id)) return;
+  const status = $('#model-status');
+  const toggle = $('#model-toggle');
+  try {
+    if (!state.modelRange) {
+      state.modelRange = await fetchWmsTimeRange('RAQDPS.SFC_PM2.5');
+      if (!state.modelRange) throw new Error('model time range unavailable');
+    }
+    const fcst = seriesFor(id, state.fcst);
+    const obs = seriesFor(id, state.obs);
+    const lastOfficial = fcst.length
+      ? fcst[fcst.length - 1].t
+      : obs.length ? obs[obs.length - 1].t : Date.now();
+    const end = Date.parse(state.modelRange.end);
+    if (end <= lastOfficial) {
+      state.modelSeries.set(id, []);
+      status.textContent = 'model adds no extra hours right now';
+      return;
+    }
+    const station = state.stations.find((s) => s.id === id);
+    toggle.disabled = true;
+    const series = await fetchModelAqhi(station, lastOfficial, end, (done, total) => {
+      status.textContent = `loading model ${Math.round((100 * done) / total)}%`;
+    });
+    state.modelSeries.set(id, series);
+    status.textContent = '';
+  } catch (err) {
+    console.error('[AQHI] model fetch failed', err);
+    status.textContent = 'model data unavailable';
+    state.modelOn = false;
+    toggle.checked = false;
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
+async function setModelOn(on) {
+  state.modelOn = on;
+  $('#model-key').hidden = !on;
+  if (on) {
+    await ensureModelSeries();
+  } else {
+    $('#model-status').textContent = '';
+  }
+  renderChart();
+}
+
+function initModelToggle() {
+  const toggle = $('#model-toggle');
+  toggle.addEventListener('change', () => setModelOn(toggle.checked));
 }
 
 function initTableToggle() {
@@ -353,6 +417,7 @@ async function boot() {
   renderScaleLegend();
   initRangeButtons();
   initTableToggle();
+  initModelToggle();
   await loadData({ firstLoad: true });
   populateStations();
   renderTiles();
