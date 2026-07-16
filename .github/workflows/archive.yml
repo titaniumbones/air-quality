@@ -1,0 +1,35 @@
+name: Archive AQHI observations
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"  # every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update observation archive
+        run: python3 scripts/update_archive.py
+
+      - name: Commit archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/archive/observations.json
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Archive AQHI observations ($(date -u +%Y-%m-%dT%H:%MZ))"
+            git pull --rebase origin main
+            git push
+          fi

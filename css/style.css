@@ -1,0 +1,332 @@
+/* Toronto AQHI dashboard — chart chrome per the reference dataviz palette;
+   AQHI marks use ECCC's official index colors (always paired with values). */
+
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --series: #2a78d6;
+  --good: #006300;
+  --bad: #d03b3b;
+  --wash: rgba(42, 120, 214, 0.10);
+  --band-opacity: 0.06;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --series: #3987e5;
+  --good: #0ca30c;
+  --bad: #d03b3b;
+  --wash: rgba(57, 135, 229, 0.12);
+  --band-opacity: 0.10;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+a { color: var(--series); }
+
+/* ---------- layout ---------- */
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px 8px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.site-header h1 { margin: 0; font-size: 24px; font-weight: 650; }
+.subtitle { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.updated { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 24px 32px;
+  display: grid;
+  gap: 16px;
+  transition: opacity 0.2s;
+}
+main.reloading { opacity: 0.6; }
+
+.site-footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 40px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.error-banner {
+  max-width: 1200px;
+  margin: 8px auto 0;
+  padding: 10px 24px;
+  color: var(--bad);
+  font-size: 14px;
+}
+
+/* ---------- cards & tiles ---------- */
+.card, .tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card-header h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.card-header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.tiles {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .hero-tile { grid-column: 1 / -1; }
+}
+.tile-label { color: var(--ink-2); font-size: 13px; margin-bottom: 6px; }
+.tile-value { font-size: 32px; font-weight: 600; }
+.tile-note { color: var(--muted); font-size: 12.5px; }
+.tile-chip { margin-top: 6px; }
+
+/* hero */
+.hero-row { display: flex; align-items: center; gap: 14px; }
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  height: 76px;
+  padding: 0 10px;
+  border-radius: 12px;
+}
+.hero-value { font-size: 46px; font-weight: 650; }
+.hero-meta { display: flex; flex-direction: column; gap: 4px; }
+.hero-message { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.hero-message-risk { margin-top: 4px; color: var(--muted); }
+
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cat-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.delta { font-size: 13px; margin-top: 4px; color: var(--muted); }
+.delta-bad { color: var(--bad); }
+.delta-good { color: var(--good); }
+.spark { margin-top: 4px; }
+.spark-line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+
+/* ---------- forecast cards ---------- */
+.fcst-cards { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+.fcst-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 128px;
+}
+.fcst-period { font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+.fcst-value-row { display: flex; align-items: center; gap: 8px; }
+.fcst-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px; height: 34px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 650;
+}
+.fcst-cat { font-size: 13px; font-weight: 600; }
+.fcst-smoke { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.fcst-pub { align-self: flex-end; margin-left: auto; font-size: 12px; color: var(--muted); }
+
+/* ---------- filter row ---------- */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filter-label { color: var(--ink-2); font-size: 13px; }
+.filter-sep { width: 1px; height: 20px; background: var(--border); }
+select, .range-btn, .ghost-btn, .icon-btn {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+select { padding-right: 6px; }
+.range-btn[aria-pressed="true"] {
+  border-color: var(--series);
+  color: var(--series);
+  font-weight: 650;
+}
+.range-btn:hover, .ghost-btn:hover, .icon-btn:hover { border-color: var(--muted); }
+.icon-btn { min-width: 34px; }
+
+/* ---------- timeline chart ---------- */
+.chart-card { position: relative; }
+#chart { width: 100%; }
+.timeline-svg { display: block; width: 100%; outline-offset: 3px; }
+.timeline-svg text { font-family: inherit; }
+.band-fill { opacity: var(--band-opacity); }
+.band-label { fill: var(--muted); font-size: 11px; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.baseline { stroke: var(--baseline); stroke-width: 1; }
+.axis-tick { stroke: var(--baseline); stroke-width: 1; }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tick-y { text-anchor: end; }
+.tick-x { text-anchor: middle; }
+.tick-day { text-anchor: start; fill: var(--ink-2); font-weight: 600; }
+.obs-line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.obs-area { fill: var(--wash); stroke: none; }
+.fcst-line {
+  fill: none; stroke: var(--series); stroke-width: 2;
+  stroke-dasharray: 5 5; stroke-linecap: round; opacity: 0.85;
+}
+.now-line { stroke: var(--baseline); stroke-width: 1; }
+.now-label { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+.dot { fill: var(--series); }
+.dot-ring { fill: var(--surface); }
+.end-label { fill: var(--ink); font-size: 12px; font-weight: 650; text-anchor: middle; }
+.crosshair { stroke: var(--baseline); stroke-width: 1; }
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  padding: 8px 12px;
+  pointer-events: none;
+  min-width: 130px;
+}
+.tt-value { font-size: 16px; font-weight: 650; }
+.tt-cat { font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 2px; }
+.tt-key { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 4px; }
+.tt-when { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* legend keys in the card header */
+.key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.key-line { display: inline-block; width: 20px; height: 0; border-top: 2px solid var(--series); }
+.key-dashed { border-top-style: dashed; }
+
+/* table view */
+.table-wrap { max-height: 340px; overflow: auto; }
+.data-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.data-table caption { text-align: left; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.data-table th, .data-table td {
+  text-align: left;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--grid);
+}
+.data-table td:nth-child(2) { font-variant-numeric: tabular-nums; }
+.data-table th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+
+/* ---------- map ---------- */
+#map {
+  height: 520px;
+  border-radius: 8px;
+  background: var(--page);
+}
+@media (max-width: 700px) { #map { height: 380px; } }
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+#time-slider { flex: 1; accent-color: var(--series); }
+.time-label { font-size: 13px; color: var(--ink-2); min-width: 210px; text-align: right; }
+.overlay-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.wms-legend { margin-top: 8px; max-width: 100%; background: #fff; border-radius: 6px; padding: 4px; }
+
+.aqhi-marker-wrap { background: none; border: none; }
+.aqhi-marker {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--surface), 0 1px 4px rgba(0,0,0,0.3);
+}
+.aqhi-marker-fcst { border-radius: 8px; }  /* squares = forecast, circles = observed */
+.aqhi-marker-empty { background: var(--surface); color: var(--muted); }
+
+/* AQHI scale strip */
+.aqhi-scale { display: flex; gap: 2px; margin-top: 14px; }
+.scale-cell {
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 3px 0;
+  border-radius: 3px;
+}
+.scale-cats {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+
+/* leaflet chrome in dark mode */
+:root[data-theme="dark"] .leaflet-control-zoom a,
+:root[data-theme="dark"] .leaflet-control-attribution {
+  background: var(--surface);
+  color: var(--ink-2);
+}
+:root[data-theme="dark"] .leaflet-control-attribution a { color: var(--series); }
+:root[data-theme="dark"] .leaflet-tooltip {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main { transition: none; }
+}
