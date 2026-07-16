@@ -82,7 +82,9 @@ function renderTiles() {
   const stationName = state.stations.find((s) => s.id === state.station)?.name ?? state.station;
   const last = obs[obs.length - 1];
 
-  // Hero tile
+  // Page + hero titles follow the selected station
+  $('#page-title').textContent = `${stationName} air quality`;
+  document.title = `${stationName} Air Quality — AQHI Dashboard`;
   $('#hero-station').textContent = stationName;
   const heroVal = $('#hero-value');
   heroVal.textContent = last ? displayValue(last.v) : '–';
