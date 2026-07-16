@@ -252,6 +252,12 @@ select { padding-right: 6px; }
 .key-line { display: inline-block; width: 20px; height: 0; border-top: 2px solid var(--series); }
 .key-dashed { border-top-style: dashed; }
 
+.history-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 /* table view */
 .table-wrap { max-height: 340px; overflow: auto; }
 .data-table { border-collapse: collapse; width: 100%; font-size: 13px; }

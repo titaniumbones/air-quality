@@ -178,6 +178,23 @@ function renderChart() {
   const data = chartData();
   renderTimeline($('#chart'), $('.chart-card'), data);
   renderTable($('#chart-table'), data);
+
+  // When the selected range asks for more history than exists yet, say so
+  // (ECCC's feed keeps ~3 days; the archive job grows it toward 7).
+  const note = $('#history-note');
+  const full = seriesFor(state.station, state.obs);
+  const availableHours = full.length
+    ? (Date.now() - full[0].t) / HOUR
+    : 0;
+  if (full.length && availableHours < state.rangeHours - 1) {
+    note.textContent =
+      `History for this station is available from ${fmtDayTime(full[0].t)} — ` +
+      'the ECCC feed keeps about 3 days, and the archive job is extending it ' +
+      'toward the full 7 days.';
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+  }
 }
 
 // ---------- map ----------
