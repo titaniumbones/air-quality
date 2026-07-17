@@ -106,7 +106,7 @@ main.reloading { opacity: 0.6; }
 
 .tiles {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 12px;
 }
 @media (max-width: 900px) {
@@ -273,7 +273,7 @@ select { padding-right: 6px; }
   padding: 5px 10px;
   border-bottom: 1px solid var(--grid);
 }
-.data-table td:nth-child(2) { font-variant-numeric: tabular-nums; }
+.data-table td:nth-child(2), .data-table td:nth-child(3) { font-variant-numeric: tabular-nums; }
 .data-table th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
 
 /* ---------- map ---------- */

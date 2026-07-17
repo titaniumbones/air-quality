@@ -161,3 +161,29 @@ export async function fetchWmsTimeRange(layer = 'RAQDPS.SFC_PM2.5') {
     return null;
   }
 }
+
+const OPEN_METEO = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+
+// Open-Meteo UTC time strings ("2026-07-16T14:00") -> ms epoch.
+const omMs = (t) => Date.parse(t.length === 16 ? `${t}:00Z` : `${t}Z`);
+
+/**
+ * US EPA AQI for one station from Open-Meteo (CC BY 4.0).
+ * Returns {current: {v, t} | null, hourly: Map(msEpoch -> aqi)}.
+ */
+export async function fetchUsAqi(station, pastDays = 7, forecastDays = 3) {
+  const d = await getJSON(
+    `${OPEN_METEO}?latitude=${station.lat}&longitude=${station.lon}` +
+    `&current=us_aqi&hourly=us_aqi&timezone=UTC` +
+    `&past_days=${pastDays}&forecast_days=${forecastDays}`
+  );
+  const hourly = new Map();
+  (d.hourly?.time || []).forEach((t, i) => {
+    const v = d.hourly.us_aqi[i];
+    if (v != null) hourly.set(omMs(t), v);
+  });
+  const current = d.current?.us_aqi != null
+    ? { v: d.current.us_aqi, t: omMs(d.current.time) }
+    : null;
+  return { current, hourly };
+}

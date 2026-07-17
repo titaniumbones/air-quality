@@ -3,8 +3,9 @@
 
 import {
   fetchStations, fetchObservations, fetchForecasts, fetchArchive,
-  fetchBulletin, fetchWmsTimeRange, mergeObservations,
+  fetchBulletin, fetchWmsTimeRange, fetchUsAqi, mergeObservations,
 } from './api.js';
+import { aqiCategoryFor, aqiDisplay } from './aqi.js';
 import {
   displayValue, colorFor, categoryFor, inkOn, MESSAGES, CATEGORIES,
   AQHI_COLORS, fmtDayTime, fmtTime,
@@ -27,6 +28,7 @@ const state = {
   modelOn: false,
   modelSeries: new Map(), // stationId -> [{t,v}] model-estimated AQHI
   modelRange: null,       // {start,end} of the RAQDPS layer, fetched once
+  aqi: null,              // {current, hourly: Map(ms -> v)} US AQI for the selected station
 };
 
 // ---------- theme ----------
@@ -62,17 +64,17 @@ function chartData() {
   const model = state.modelOn
     ? (state.modelSeries.get(state.station) || []).filter((d) => d.t > fcstEnd)
     : [];
-  return { obs, fcst, model };
+  return { obs, fcst, model, aqi: state.aqi?.hourly || null };
 }
 
 // ---------- stat tiles ----------
-function chip(cat) {
+function chip(cat, label = cat ? `${cat.name} risk` : 'No data') {
   const c = document.createElement('span');
   c.className = 'cat-chip';
   const dot = document.createElement('span');
   dot.className = 'cat-dot';
   dot.style.background = cat?.color || '#898781';
-  c.append(dot, document.createTextNode(cat ? `${cat.name} risk` : 'No data'));
+  c.append(dot, document.createTextNode(label));
   return c;
 }
 
@@ -132,6 +134,36 @@ function setTile(sel, value, note, cat) {
   const chipHost = tile.querySelector('.tile-chip');
   chipHost.textContent = '';
   if (cat) chipHost.appendChild(chip(cat));
+}
+
+// ---------- US AQI tile (Open-Meteo) ----------
+async function loadAqi() {
+  const station = state.stations.find((s) => s.id === state.station);
+  if (!station) return;
+  const forStation = state.station;
+  try {
+    const aqi = await fetchUsAqi(station);
+    if (state.station !== forStation) return; // user switched mid-fetch
+    state.aqi = aqi;
+  } catch (err) {
+    console.error('[AQI] Open-Meteo fetch failed', err);
+    if (state.station !== forStation) return;
+    state.aqi = { current: null, hourly: new Map() };
+  }
+  renderAqiTile();
+  renderChart(); // tooltip + table pick up the hourly AQI
+}
+
+function renderAqiTile() {
+  const cur = state.aqi?.current;
+  const cat = cur ? aqiCategoryFor(cur.v) : null;
+  const tile = $('#tile-aqi');
+  tile.querySelector('.tile-value').textContent = cur ? aqiDisplay(cur.v) : '–';
+  tile.querySelector('.tile-note').textContent =
+    cur ? `as of ${fmtTime(cur.t)}` : state.aqi ? 'unavailable' : 'loading…';
+  const chipHost = tile.querySelector('.tile-chip');
+  chipHost.textContent = '';
+  if (cat) chipHost.appendChild(chip(cat, cat.name));
 }
 
 // ---------- forecast period cards ----------
@@ -300,9 +332,12 @@ function populateStations() {
 function selectStation(id) {
   state.station = id;
   localStorage.setItem('aqhi-station', id);
+  state.aqi = null; // don't show the previous station's AQI
+  renderAqiTile();
   renderTiles();
   renderChart();
   renderForecastCards();
+  loadAqi();
   if (state.modelOn) ensureModelSeries().then(renderChart);
 }
 
@@ -425,6 +460,7 @@ async function boot() {
   renderTiles();
   renderChart();
   renderForecastCards();
+  loadAqi(); // deliberately not awaited — Open-Meteo must never block AQHI
   initMap();
 
   // Re-render chart on resize (debounced).
@@ -440,6 +476,7 @@ async function boot() {
     renderTiles();
     renderChart();
     renderForecastCards();
+    loadAqi();
     buildMapTimeline();
   }, 10 * 60 * 1000);
 }

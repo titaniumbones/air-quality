@@ -3,6 +3,7 @@
 // navigation, and a table-view twin.
 
 import { displayValue, categoryFor, fmtDay, fmtHour, fmtDayTime, CATEGORIES } from './aqhi.js';
+import { aqiCategoryFor, aqiDisplay } from './aqi.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const HOUR = 3600 * 1000;
@@ -214,10 +215,22 @@ export function renderTimeline(container, tooltipHost, data) {
     cat.append(key, document.createTextNode(
       ` ${categoryFor(p.v)?.name ?? ''} · ${p.kind}`
     ));
+    const aqiV = data.aqi?.get(p.t);
+    let aqiLine = null;
+    if (aqiV != null) {
+      aqiLine = document.createElement('div');
+      aqiLine.className = 'tt-cat';
+      const aKey = document.createElement('span');
+      aKey.className = 'tt-key';
+      aKey.style.background = aqiCategoryFor(aqiV)?.color || '';
+      aqiLine.append(aKey, document.createTextNode(
+        ` US AQI ${aqiDisplay(aqiV)} · ${aqiCategoryFor(aqiV)?.name ?? ''}`
+      ));
+    }
     const when = document.createElement('div');
     when.className = 'tt-when';
     when.textContent = fmtDayTime(p.t);
-    tooltip.append(val, cat, when);
+    tooltip.append(val, cat, ...(aqiLine ? [aqiLine] : []), when);
     tooltip.hidden = false;
 
     const hostRect = tooltipHost.getBoundingClientRect();
@@ -260,9 +273,9 @@ export function renderTable(container, data) {
   const table = document.createElement('table');
   table.className = 'data-table';
   const cap = table.createCaption();
-  cap.textContent = 'Hourly AQHI values (observed and forecast)';
+  cap.textContent = 'Hourly AQHI and US AQI values (observed and forecast)';
   const head = table.createTHead().insertRow();
-  for (const h of ['Time (Toronto)', 'AQHI', 'Risk', 'Type']) {
+  for (const h of ['Time (Toronto)', 'AQHI', 'US AQI', 'Risk', 'Type']) {
     const th = document.createElement('th');
     th.scope = 'col';
     th.textContent = h;
@@ -278,6 +291,7 @@ export function renderTable(container, data) {
     const tr = body.insertRow();
     tr.insertCell().textContent = fmtDayTime(p.t);
     tr.insertCell().textContent = displayValue(p.v);
+    tr.insertCell().textContent = aqiDisplay(data.aqi?.get(p.t));
     tr.insertCell().textContent = categoryFor(p.v)?.name ?? '';
     tr.insertCell().textContent = p.kind;
   }
