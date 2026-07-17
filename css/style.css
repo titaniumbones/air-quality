@@ -35,6 +35,8 @@
 }
 
 * { box-sizing: border-box; }
+/* The hidden attribute must win over the display rules set on .key etc. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--page);
@@ -185,7 +187,7 @@ main.reloading { opacity: 0.6; }
 }
 .filter-label { color: var(--ink-2); font-size: 13px; }
 .filter-sep { width: 1px; height: 20px; background: var(--border); }
-select, .range-btn, .ghost-btn, .icon-btn {
+select, .range-btn, .tab-btn, .ghost-btn, .icon-btn {
   font: inherit;
   font-size: 13.5px;
   color: var(--ink);
@@ -196,12 +198,14 @@ select, .range-btn, .ghost-btn, .icon-btn {
   cursor: pointer;
 }
 select { padding-right: 6px; }
-.range-btn[aria-pressed="true"] {
+.range-btn[aria-pressed="true"], .tab-btn[aria-pressed="true"] {
   border-color: var(--series);
   color: var(--series);
   font-weight: 650;
 }
-.range-btn:hover, .ghost-btn:hover, .icon-btn:hover { border-color: var(--muted); }
+.range-btn:hover, .tab-btn:hover, .ghost-btn:hover, .icon-btn:hover { border-color: var(--muted); }
+.chart-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.chart-tabs { display: flex; gap: 6px; }
 .icon-btn { min-width: 34px; }
 
 /* ---------- timeline chart ---------- */

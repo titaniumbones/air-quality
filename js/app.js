@@ -10,7 +10,7 @@ import {
   displayValue, colorFor, categoryFor, inkOn, MESSAGES, CATEGORIES,
   AQHI_COLORS, fmtDayTime, fmtTime,
 } from './aqhi.js';
-import { renderTimeline, renderTable, renderSparkline } from './chart.js';
+import { renderTimeline, renderTable, renderSparkline, AQHI_SCALE, AQI_SCALE } from './chart.js';
 import { fetchModelAqhi } from './model.js';
 import { AqhiMap, buildTimeline } from './map.js';
 
@@ -29,6 +29,7 @@ const state = {
   modelSeries: new Map(), // stationId -> [{t,v}] model-estimated AQHI
   modelRange: null,       // {start,end} of the RAQDPS layer, fetched once
   aqi: null,              // {current, hourly: Map(ms -> v)} US AQI for the selected station
+  chartTab: 'aqhi',       // which index the timeline shows: 'aqhi' | 'aqi'
 };
 
 // ---------- theme ----------
@@ -65,6 +66,21 @@ function chartData() {
     ? (state.modelSeries.get(state.station) || []).filter((d) => d.t > fcstEnd)
     : [];
   return { obs, fcst, model, aqi: state.aqi?.hourly || null };
+}
+
+// US AQI series shaped like chartData(): "obs" = model past, "fcst" = model
+// future, split at now so the solid/dashed convention carries over.
+function aqiChartData() {
+  const now = Date.now();
+  const cutoff = now - state.rangeHours * HOUR;
+  const all = [...(state.aqi?.hourly || new Map()).entries()]
+    .map(([t, v]) => ({ t, v }))
+    .sort((a, b) => a.t - b.t);
+  return {
+    obs: all.filter((d) => d.t >= cutoff && d.t <= now),
+    fcst: all.filter((d) => d.t > now),
+    model: [],
+  };
 }
 
 // ---------- stat tiles ----------
@@ -218,8 +234,13 @@ async function renderForecastCards() {
 // ---------- chart ----------
 function renderChart() {
   const data = chartData();
-  renderTimeline($('#chart'), $('.chart-card'), data);
-  renderTable($('#chart-table'), data);
+  const onAqi = state.chartTab === 'aqi';
+  renderTimeline(
+    $('#chart'), $('.chart-card'),
+    onAqi ? aqiChartData() : data,
+    onAqi ? AQI_SCALE : AQHI_SCALE
+  );
+  renderTable($('#chart-table'), data); // table always carries both indexes
 
   // When the selected range asks for more history than exists yet, say so
   // (ECCC's feed keeps ~3 days; the archive job grows it toward 7).
@@ -341,6 +362,28 @@ function selectStation(id) {
   if (state.modelOn) ensureModelSeries().then(renderChart);
 }
 
+function initChartTabs() {
+  for (const btn of document.querySelectorAll('.tab-btn')) {
+    btn.addEventListener('click', () => {
+      state.chartTab = btn.dataset.chartTab;
+      for (const b of document.querySelectorAll('.tab-btn')) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      }
+      const onAqi = state.chartTab === 'aqi';
+      $('#chart-title').textContent = onAqi
+        ? 'Hourly US AQI — modelled past & forecast'
+        : 'Hourly AQHI — observed & forecast';
+      $('#key-obs-label').textContent = onAqi ? 'Past (model)' : 'Observed';
+      $('#key-fcst-label').textContent = 'Forecast';
+      // The +72 h model estimate extends the AQHI forecast only.
+      $('#model-toggle').closest('.overlay-label').hidden = onAqi;
+      $('#model-status').hidden = onAqi;
+      $('#model-key').hidden = onAqi || !state.modelOn;
+      renderChart();
+    });
+  }
+}
+
 function initRangeButtons() {
   for (const btn of document.querySelectorAll('.range-btn')) {
     btn.addEventListener('click', () => {
@@ -452,6 +495,7 @@ async function loadData({ firstLoad = false } = {}) {
 async function boot() {
   initTheme();
   renderScaleLegend();
+  initChartTabs();
   initRangeButtons();
   initTableToggle();
   initModelToggle();

@@ -90,10 +90,16 @@
     <!-- Timeline chart -->
     <section class="card chart-card" aria-label="AQHI timeline">
       <header class="card-header">
-        <h2>Hourly AQHI — observed &amp; forecast</h2>
+        <div class="chart-title-row">
+          <h2 id="chart-title">Hourly AQHI — observed &amp; forecast</h2>
+          <div class="chart-tabs" role="group" aria-label="Chart index">
+            <button class="tab-btn" data-chart-tab="aqhi" aria-pressed="true">AQHI</button>
+            <button class="tab-btn" data-chart-tab="aqi" aria-pressed="false">US AQI</button>
+          </div>
+        </div>
         <div class="card-header-right">
-          <span class="key"><span class="key-line key-solid"></span>Observed</span>
-          <span class="key"><span class="key-line key-dashed"></span>Forecast</span>
+          <span class="key"><span class="key-line key-solid"></span><span id="key-obs-label">Observed</span></span>
+          <span class="key"><span class="key-line key-dashed"></span><span id="key-fcst-label">Forecast</span></span>
           <span class="key" id="model-key" hidden><span class="key-line key-dotted"></span>Model estimate</span>
           <label class="overlay-label">
             <input type="checkbox" id="model-toggle">

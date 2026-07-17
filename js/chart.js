@@ -3,7 +3,7 @@
 // navigation, and a table-view twin.
 
 import { displayValue, categoryFor, fmtDay, fmtHour, fmtDayTime, CATEGORIES } from './aqhi.js';
-import { aqiCategoryFor, aqiDisplay } from './aqi.js';
+import { aqiCategoryFor, aqiDisplay, AQI_CATEGORIES } from './aqi.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const HOUR = 3600 * 1000;
@@ -15,21 +15,62 @@ function el(name, attrs = {}, parent) {
   return n;
 }
 
-// Risk bands drawn behind the data. Fill uses the category's representative
-// AQHI color as a faint wash; the band label names it (color never alone).
-const BANDS = [
-  { from: 0, to: 3.5, cat: CATEGORIES[0] },
-  { from: 3.5, to: 6.5, cat: CATEGORIES[1] },
-  { from: 6.5, to: 10.5, cat: CATEGORIES[2] },
-  { from: 10.5, to: Infinity, cat: CATEGORIES[3] },
-];
+// A scale bundles everything index-specific the timeline needs: risk bands
+// (drawn as faint washes behind the data — the label names the band, color is
+// never alone), axis behavior, formatting, and series naming.
+export const AQHI_SCALE = {
+  label: 'AQHI',
+  bands: [
+    { from: 0, to: 3.5, cat: CATEGORIES[0] },
+    { from: 3.5, to: 6.5, cat: CATEGORIES[1] },
+    { from: 6.5, to: 10.5, cat: CATEGORIES[2] },
+    { from: 10.5, to: Infinity, cat: CATEGORIES[3] },
+  ],
+  vmaxFor: (max) => Math.max(12, Math.ceil(max + 1)),
+  tickStep: () => 2,
+  display: displayValue,
+  categoryFor,
+  kinds: { obs: 'Observed', fcst: 'Forecast', model: 'Model estimate' },
+  // Secondary tooltip line: the US AQI for the hovered hour, when loaded.
+  extraTooltip(data, p) {
+    const v = data.aqi?.get(p.t);
+    if (v == null) return null;
+    const line = document.createElement('div');
+    line.className = 'tt-cat';
+    const key = document.createElement('span');
+    key.className = 'tt-key';
+    key.style.background = aqiCategoryFor(v)?.color || '';
+    line.append(key, document.createTextNode(
+      ` US AQI ${aqiDisplay(v)} · ${aqiCategoryFor(v)?.name ?? ''}`
+    ));
+    return line;
+  },
+};
+
+export const AQI_SCALE = {
+  label: 'US AQI',
+  bands: AQI_CATEGORIES.map((cat, i) => ({
+    from: i ? AQI_CATEGORIES[i - 1].max : 0,
+    to: cat.max,
+    cat,
+    shortLabel: cat.short,
+  })),
+  vmaxFor: (max) => Math.max(60, Math.ceil((max + 10) / 10) * 10),
+  tickStep: (vmax) => (vmax <= 160 ? 25 : vmax <= 400 ? 50 : 100),
+  display: aqiDisplay,
+  categoryFor: aqiCategoryFor,
+  // Both directions come from the CAMS model, so "Observed" would overclaim.
+  kinds: { obs: 'Past (model)', fcst: 'Forecast' },
+  extraTooltip: () => null,
+};
 
 /**
  * @param container  host element (emptied and refilled)
  * @param tooltipHost positioned ancestor for the tooltip div
  * @param data {obs:[{t,v}], fcst:[{t,v}], model?:[{t,v}]} sorted by time (ms epochs)
+ * @param scale index definition (bands, formatting) — defaults to AQHI
  */
-export function renderTimeline(container, tooltipHost, data) {
+export function renderTimeline(container, tooltipHost, data, scale = AQHI_SCALE) {
   container.textContent = '';
   tooltipHost.querySelectorAll('.chart-tooltip').forEach((n) => n.remove());
   const model = data.model || [];
@@ -46,7 +87,7 @@ export function renderTimeline(container, tooltipHost, data) {
   }
   const t0 = Math.min(...all.map((d) => d.t));
   const t1 = Math.max(...all.map((d) => d.t));
-  const vmax = Math.max(12, Math.ceil(Math.max(...all.map((d) => d.v)) + 1));
+  const vmax = scale.vmaxFor(Math.max(...all.map((d) => d.v)));
 
   const x = (t) => m.left + ((t - t0) / (t1 - t0 || 1)) * pw;
   const y = (v) => m.top + ph - (v / vmax) * ph;
@@ -55,13 +96,13 @@ export function renderTimeline(container, tooltipHost, data) {
     width, height,
     viewBox: `0 0 ${width} ${height}`,
     role: 'img',
-    'aria-label': `AQHI timeline from ${fmtDayTime(t0)} to ${fmtDayTime(t1)}. Use the table view for exact values.`,
+    'aria-label': `${scale.label} timeline from ${fmtDayTime(t0)} to ${fmtDayTime(t1)}. Use the table view for exact values.`,
   }, container);
   svg.setAttribute('tabindex', '0');
   svg.classList.add('timeline-svg');
 
   // --- risk bands (behind everything) ---
-  for (const b of BANDS) {
+  for (const b of scale.bands) {
     const top = y(Math.min(b.to === Infinity ? vmax : b.to, vmax));
     const bot = y(b.from);
     if (bot - top < 1) continue;
@@ -69,15 +110,16 @@ export function renderTimeline(container, tooltipHost, data) {
       x: m.left, y: top, width: pw, height: bot - top,
       fill: b.cat.color, class: 'band-fill',
     }, svg);
+    if (bot - top < 12) continue; // sliver of a clipped band: skip the label
     const label = el('text', {
       x: m.left + pw + 8, y: (top + bot) / 2 + 3.5,
       class: 'band-label',
     }, svg);
-    label.textContent = b.cat.name;
+    label.textContent = b.shortLabel ?? b.cat.name;
   }
 
   // --- grid + y ticks ---
-  for (let v = 0; v <= vmax; v += 2) {
+  for (let v = 0; v <= vmax; v += scale.tickStep(vmax)) {
     el('line', {
       x1: m.left, x2: m.left + pw, y1: y(v), y2: y(v), class: 'gridline',
     }, svg);
@@ -168,14 +210,14 @@ export function renderTimeline(container, tooltipHost, data) {
     const lbl = el('text', {
       x: x(last.t), y: y(last.v) - 12, class: 'end-label',
     }, svg);
-    lbl.textContent = displayValue(last.v);
+    lbl.textContent = scale.display(last.v);
   }
 
   // --- hover layer: crosshair + tooltip, keyboard navigable ---
   const points = [
-    ...data.obs.map((p) => ({ ...p, kind: 'Observed' })),
-    ...data.fcst.map((p) => ({ ...p, kind: 'Forecast' })),
-    ...model.map((p) => ({ ...p, kind: 'Model estimate' })),
+    ...data.obs.map((p) => ({ ...p, kind: scale.kinds.obs })),
+    ...data.fcst.map((p) => ({ ...p, kind: scale.kinds.fcst })),
+    ...model.map((p) => ({ ...p, kind: scale.kinds.model })),
   ].sort((a, b) => a.t - b.t);
   const cross = el('line', {
     y1: m.top, y2: m.top + ph, class: 'crosshair', visibility: 'hidden',
@@ -206,31 +248,20 @@ export function renderTimeline(container, tooltipHost, data) {
     tooltip.textContent = '';
     const val = document.createElement('div');
     val.className = 'tt-value';
-    val.textContent = `AQHI ${displayValue(p.v)}`;
+    val.textContent = `${scale.label} ${scale.display(p.v)}`;
     const cat = document.createElement('div');
     cat.className = 'tt-cat';
     const key = document.createElement('span');
     key.className = 'tt-key';
-    key.style.background = categoryFor(p.v)?.color || '';
+    key.style.background = scale.categoryFor(p.v)?.color || '';
     cat.append(key, document.createTextNode(
-      ` ${categoryFor(p.v)?.name ?? ''} · ${p.kind}`
+      ` ${scale.categoryFor(p.v)?.name ?? ''} · ${p.kind}`
     ));
-    const aqiV = data.aqi?.get(p.t);
-    let aqiLine = null;
-    if (aqiV != null) {
-      aqiLine = document.createElement('div');
-      aqiLine.className = 'tt-cat';
-      const aKey = document.createElement('span');
-      aKey.className = 'tt-key';
-      aKey.style.background = aqiCategoryFor(aqiV)?.color || '';
-      aqiLine.append(aKey, document.createTextNode(
-        ` US AQI ${aqiDisplay(aqiV)} · ${aqiCategoryFor(aqiV)?.name ?? ''}`
-      ));
-    }
+    const extra = scale.extraTooltip(data, p);
     const when = document.createElement('div');
     when.className = 'tt-when';
     when.textContent = fmtDayTime(p.t);
-    tooltip.append(val, cat, ...(aqiLine ? [aqiLine] : []), when);
+    tooltip.append(val, cat, ...(extra ? [extra] : []), when);
     tooltip.hidden = false;
 
     const hostRect = tooltipHost.getBoundingClientRect();
