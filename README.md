@@ -26,9 +26,11 @@ All data comes from the [MSC GeoMet](https://eccc-msc.github.io/open-data/msc-ge
 
 - GeoMet **WMS GetFeatureInfo** on `RAQDPS.SFC_PM2.5` / `SFC_O3` / `SFC_NO2` — point-sampled at the selected station to compute an optional **model-estimated AQHI** (published AQHI formula, 3-hour rolling means) for hours beyond the official hourly forecast, out to the model's +72 h horizon. Clearly labeled "Model estimate" and drawn dotted: it is raw model guidance, not a forecaster product, so it can disagree with the period bulletin.
 
-One source is outside GeoMet:
+Two sources are outside GeoMet:
 
 - [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api) — current + hourly **US EPA AQI** for the selected station (no key, CORS-enabled; model-based, ~40 km CAMS global grid). Shown as a stat tile and in the chart tooltip / table view. Data by [Open-Meteo](https://open-meteo.com/), CC BY 4.0.
+
+- [Air Quality Ontario](https://www.airqualityontario.com/) (MECP) — hourly station **PM2.5**, used to derive **Ontario AQHI+** (`ceil(1-hr PM2.5 / 10)`, uncapped — the methodology Ontario adopted in May 2024 and the number media report during smoke events; ECCC's feed caps AQHI at "10+", encoded as 11). MECP has no API and no CORS, so `scripts/update_pm25.py` scrapes the hourly concentration summary page (which accepts historical day/hour queries) from the archive workflow into `data/archive/pm25.json`. Drawn as a third line on the AQHI chart with tooltip + table support.
 
 ## Seven-day history
 

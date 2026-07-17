@@ -31,19 +31,33 @@ export const AQHI_SCALE = {
   display: displayValue,
   categoryFor,
   kinds: { obs: 'Observed', fcst: 'Forecast', model: 'Model estimate' },
-  // Secondary tooltip line: the US AQI for the hovered hour, when loaded.
+  // Secondary tooltip lines: Ontario AQHI+ and US AQI for the hovered hour.
   extraTooltip(data, p) {
+    const lines = [];
+    const pm = data.pm25?.get(p.t);
+    if (pm != null) {
+      const line = document.createElement('div');
+      line.className = 'tt-cat';
+      const key = document.createElement('span');
+      key.className = 'tt-key tt-key-plus';
+      line.append(key, document.createTextNode(
+        ` Ontario AQHI+ ${Math.ceil(pm / 10)} · PM2.5 ${Math.round(pm)} µg/m³`
+      ));
+      lines.push(line);
+    }
     const v = data.aqi?.get(p.t);
-    if (v == null) return null;
-    const line = document.createElement('div');
-    line.className = 'tt-cat';
-    const key = document.createElement('span');
-    key.className = 'tt-key';
-    key.style.background = aqiCategoryFor(v)?.color || '';
-    line.append(key, document.createTextNode(
-      ` US AQI ${aqiDisplay(v)} · ${aqiCategoryFor(v)?.name ?? ''}`
-    ));
-    return line;
+    if (v != null) {
+      const line = document.createElement('div');
+      line.className = 'tt-cat';
+      const key = document.createElement('span');
+      key.className = 'tt-key';
+      key.style.background = aqiCategoryFor(v)?.color || '';
+      line.append(key, document.createTextNode(
+        ` US AQI ${aqiDisplay(v)} · ${aqiCategoryFor(v)?.name ?? ''}`
+      ));
+      lines.push(line);
+    }
+    return lines.length ? lines : null;
   },
 };
 
@@ -74,13 +88,14 @@ export function renderTimeline(container, tooltipHost, data, scale = AQHI_SCALE)
   container.textContent = '';
   tooltipHost.querySelectorAll('.chart-tooltip').forEach((n) => n.remove());
   const model = data.model || [];
+  const plus = data.plus || [];
   const width = container.clientWidth || 800;
   const height = 320;
   const m = { top: 18, right: 74, bottom: 30, left: 34 };
   const pw = width - m.left - m.right;
   const ph = height - m.top - m.bottom;
 
-  const all = [...data.obs, ...data.fcst, ...model];
+  const all = [...data.obs, ...data.fcst, ...model, ...plus];
   if (!all.length) {
     container.textContent = 'No data available.';
     return;
@@ -194,6 +209,11 @@ export function renderTimeline(container, tooltipHost, data, scale = AQHI_SCALE)
     el('path', { d: path(mpts), class: 'model-line' }, svg);
   }
 
+  // --- Ontario AQHI+ (PM2.5-derived, uncapped) — drawn over the ECCC series ---
+  if (plus.length) {
+    el('path', { d: path(plus), class: 'plus-line' }, svg);
+  }
+
   // --- "now" marker ---
   const now = Date.now();
   if (now > t0 && now < t1) {
@@ -261,7 +281,7 @@ export function renderTimeline(container, tooltipHost, data, scale = AQHI_SCALE)
     const when = document.createElement('div');
     when.className = 'tt-when';
     when.textContent = fmtDayTime(p.t);
-    tooltip.append(val, cat, ...(extra ? [extra] : []), when);
+    tooltip.append(val, cat, ...[extra ?? []].flat(), when);
     tooltip.hidden = false;
 
     const hostRect = tooltipHost.getBoundingClientRect();
@@ -306,7 +326,7 @@ export function renderTable(container, data) {
   const cap = table.createCaption();
   cap.textContent = 'Hourly AQHI and US AQI values (observed and forecast)';
   const head = table.createTHead().insertRow();
-  for (const h of ['Time (Toronto)', 'AQHI', 'US AQI', 'Risk', 'Type']) {
+  for (const h of ['Time (Toronto)', 'AQHI', 'AQHI+', 'US AQI', 'Risk', 'Type']) {
     const th = document.createElement('th');
     th.scope = 'col';
     th.textContent = h;
@@ -322,6 +342,8 @@ export function renderTable(container, data) {
     const tr = body.insertRow();
     tr.insertCell().textContent = fmtDayTime(p.t);
     tr.insertCell().textContent = displayValue(p.v);
+    const pm = data.pm25?.get(p.t);
+    tr.insertCell().textContent = pm == null ? '–' : String(Math.ceil(pm / 10));
     tr.insertCell().textContent = aqiDisplay(data.aqi?.get(p.t));
     tr.insertCell().textContent = categoryFor(p.v)?.name ?? '';
     tr.insertCell().textContent = p.kind;

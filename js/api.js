@@ -126,6 +126,28 @@ export async function fetchArchive() {
   }
 }
 
+/**
+ * Archived hourly PM2.5 from Air Quality Ontario (MECP), committed by the
+ * GitHub Action. Keyed by MECP station name. Used to derive Ontario's
+ * uncapped AQHI+ (ceil(PM2.5 / 10)). Absent on first deploy — 404 is fine.
+ */
+export async function fetchPm25Archive() {
+  try {
+    const res = await fetch('data/archive/pm25.json', { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const d = await res.json();
+    const byStation = new Map();
+    for (const [name, series] of Object.entries(d.pm25 || {})) {
+      const m = new Map();
+      for (const [iso, v] of Object.entries(series)) m.set(Date.parse(iso), v);
+      byStation.set(name, m);
+    }
+    return byStation;
+  } catch {
+    return null;
+  }
+}
+
 /** Merge archive + live observations (live wins). */
 export function mergeObservations(archive, live) {
   if (!archive) return live;

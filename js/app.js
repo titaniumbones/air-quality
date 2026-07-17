@@ -3,7 +3,8 @@
 
 import {
   fetchStations, fetchObservations, fetchForecasts, fetchArchive,
-  fetchBulletin, fetchWmsTimeRange, fetchUsAqi, mergeObservations,
+  fetchBulletin, fetchWmsTimeRange, fetchUsAqi, fetchPm25Archive,
+  mergeObservations,
 } from './api.js';
 import { aqiCategoryFor, aqiDisplay } from './aqi.js';
 import {
@@ -30,6 +31,15 @@ const state = {
   modelRange: null,       // {start,end} of the RAQDPS layer, fetched once
   aqi: null,              // {current, hourly: Map(ms -> v)} US AQI for the selected station
   chartTab: 'aqhi',       // which index the timeline shows: 'aqhi' | 'aqi'
+  pm25: null,             // Map(MECP station name -> Map(ms -> µg/m³)) for AQHI+
+};
+
+// ECCC city-wide zones -> the MECP station whose PM2.5 stands in for them.
+const PM25_ALIASES = {
+  Toronto: 'Toronto Downtown',
+  Hamilton: 'Hamilton Downtown',
+  Ottawa: 'Ottawa Downtown',
+  Windsor: 'Windsor Downtown',
 };
 
 // ---------- theme ----------
@@ -65,7 +75,19 @@ function chartData() {
   const model = state.modelOn
     ? (state.modelSeries.get(state.station) || []).filter((d) => d.t > fcstEnd)
     : [];
-  return { obs, fcst, model, aqi: state.aqi?.hourly || null };
+  const pm = pm25SeriesForStation();
+  const plus = [...pm.entries()]
+    .filter(([t]) => t >= cutoff)
+    .map(([t, v]) => ({ t, v: Math.ceil(v / 10), pm: v }))
+    .sort((a, b) => a.t - b.t);
+  return { obs, fcst, model, aqi: state.aqi?.hourly || null, plus, pm25: pm };
+}
+
+/** MECP PM2.5 series (Map(ms -> µg/m³)) matching the selected station. */
+function pm25SeriesForStation() {
+  if (!state.pm25) return new Map();
+  const name = state.stations.find((s) => s.id === state.station)?.name;
+  return state.pm25.get(PM25_ALIASES[name] ?? name) || new Map();
 }
 
 // US AQI series shaped like chartData(): "obs" = model past, "fcst" = model
@@ -240,6 +262,7 @@ function renderChart() {
     onAqi ? aqiChartData() : data,
     onAqi ? AQI_SCALE : AQHI_SCALE
   );
+  $('#key-plus').hidden = onAqi || !data.plus.length;
   renderTable($('#chart-table'), data); // table always carries both indexes
 
   // When the selected range asks for more history than exists yet, say so
@@ -469,15 +492,17 @@ async function loadData({ firstLoad = false } = {}) {
   const main = $('main');
   if (!firstLoad) main.classList.add('reloading');
   try {
-    const [stations, liveObs, fcst, archive] = await Promise.all([
+    const [stations, liveObs, fcst, archive, pm25] = await Promise.all([
       firstLoad ? fetchStations() : Promise.resolve(state.stations),
       fetchObservations(),
       fetchForecasts(),
       fetchArchive(),
+      fetchPm25Archive(),
     ]);
     state.stations = stations;
     state.obs = mergeObservations(archive, liveObs);
     state.fcst = fcst;
+    state.pm25 = pm25;
     state.bulletins.clear(); // refetched on demand so they never go stale
     $('#updated').textContent = `Updated ${fmtTime(Date.now())}`;
     $('#error-banner').hidden = true;

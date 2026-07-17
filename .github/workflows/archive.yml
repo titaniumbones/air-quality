@@ -2,7 +2,7 @@ name: Archive AQHI observations
 
 on:
   schedule:
-    - cron: "23 */6 * * *"  # every 6 hours
+    - cron: "23 * * * *"  # hourly — MECP PM2.5 (for AQHI+) is only published hour by hour
   workflow_dispatch:
 
 permissions:
@@ -21,11 +21,14 @@ jobs:
       - name: Update observation archive
         run: python3 scripts/update_archive.py
 
+      - name: Update MECP PM2.5 archive (AQHI+)
+        run: python3 scripts/update_pm25.py
+
       - name: Commit archive
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/archive/observations.json
+          git add data/archive/observations.json data/archive/pm25.json
           if git diff --cached --quiet; then
             echo "No changes."
           else

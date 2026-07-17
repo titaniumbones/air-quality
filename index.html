@@ -100,6 +100,7 @@
         <div class="card-header-right">
           <span class="key"><span class="key-line key-solid"></span><span id="key-obs-label">Observed</span></span>
           <span class="key"><span class="key-line key-dashed"></span><span id="key-fcst-label">Forecast</span></span>
+          <span class="key" id="key-plus" hidden><span class="key-line key-plus"></span>Ontario AQHI+</span>
           <span class="key" id="model-key" hidden><span class="key-line key-dotted"></span>Model estimate</span>
           <label class="overlay-label">
             <input type="checkbox" id="model-toggle">
@@ -142,9 +143,10 @@
     <p>
       Data: <a href="https://eccc-msc.github.io/open-data/msc-geomet/readme_en/">Environment and
       Climate Change Canada — MSC GeoMet</a> (AQHI observations, forecasts, and the RAQDPS
-      PM2.5 model). AQHI values above 10 are shown at their actual value (all remain in the
-      Very high category).
-      Observed history beyond ~3 days accumulates via a scheduled archive job.
+      PM2.5 model). ECCC reports AQHI above 10 as "10+"; the <strong>Ontario AQHI+</strong> line
+      is derived from <a href="https://www.airqualityontario.com/">Air Quality Ontario</a> (MECP)
+      hourly PM2.5 (index = PM2.5 ÷ 10, rounded up, uncapped — the value Ontario reports during
+      smoke events). Observed history accumulates via a scheduled archive job.
     </p>
     <p>
       About the index: <a href="https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index.html">
