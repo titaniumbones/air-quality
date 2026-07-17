@@ -44,11 +44,10 @@ export const MESSAGES = {
   },
 };
 
-/** Rounded display value; AQHI above 10 is reported as "10+". */
+/** Rounded display value; values above 10 keep the "Very high" category/color. */
 export function displayValue(v) {
   if (v == null || Number.isNaN(v)) return '–';
-  const n = Math.round(v);
-  return n > 10 ? '10+' : String(Math.max(1, n));
+  return String(Math.max(1, Math.round(v)));
 }
 
 /** Color for a (possibly fractional) AQHI value. */
